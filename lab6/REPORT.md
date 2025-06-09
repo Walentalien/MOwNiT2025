@@ -10,6 +10,14 @@ The script `lsi_search.py` allows querying the collection and compares results
 obtained directly from the TF–IDF matrix with results using a low rank
 approximation obtained from Singular Value Decomposition (SVD).
 
+Install the required dependencies with:
+
+```bash
+pip install -r requirements.txt
+```
+
+**Note:** the package providing `sklearn` is named `scikit-learn` on PyPI.
+
 Example usage:
 
 ```bash
