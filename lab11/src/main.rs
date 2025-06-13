@@ -3,6 +3,79 @@ use nalgebra::linalg::QR;
 use rand::{thread_rng, Rng};
 use rand::distr::Uniform;
 use lab11::*;
+use plotters::prelude::*;
+//code for task 2
+fn qr_decompose(a: &Vec<Vec<f64>>) -> (Vec<Vec<f64>>, Vec<Vec<f64>>) {
+    let m = a.len();
+    let n = a[0].len();
+    let mut q = vec![vec![0.0; n]; m];
+    let mut r = vec![vec![0.0; n]; n];
+
+    for j in 0..n {
+        //for column j
+        let mut v = vec![0.0; m];
+        for i in 0..m {
+            v[i] = a[i][j];
+        }
+        // projection on previous vectors
+        for i in 0..j {
+            let mut dot = 0.0;
+            for k in 0..m {
+                dot += q[k][i] * v[k];
+            }
+            r[i][j] = dot;
+            for k in 0..m {
+                v[k] -= dot * q[k][i];
+            }
+        }
+        // nirm and normalizationS
+        let mut norm = 0.0;
+        for k in 0..m {
+            norm += v[k] * v[k];
+        }
+        let norm = norm.sqrt();
+        r[j][j] = norm;
+        if norm > 1e-12 {
+            for k in 0..m {
+                q[k][j] = v[k] / norm;
+            }
+        }
+    }
+    (q, r)
+}
+
+fn solve_least_squares_qr(a: &Vec<Vec<f64>>, b: &Vec<f64>) -> Vec<f64> {
+    let (q, r) = qr_decompose(a);
+    let m = a.len();
+    let n = a[0].len();
+
+    // calculate Q^T b
+    let mut qt_b = vec![0.0; n];
+    for i in 0..n {
+        let mut sum = 0.0;
+        for k in 0..m {
+            sum += q[k][i] * b[k];
+        }
+        qt_b[i] = sum;
+    }
+
+    // solve R x = Q^T b with back substitution
+    let mut x = vec![0.0; n];
+    for i_rev in 0..n {
+        let i = n - 1 - i_rev;
+        if r[i][i].abs() < 1e-12 {
+            x[i] = 0.0;
+            continue;
+        }
+        let mut sum = 0.0;
+        for j in (i + 1)..n {
+            sum += r[i][j] * x[j];
+        }
+        x[i] = (qt_b[i] - sum) / r[i][i];
+    }
+    x
+}
+
 fn main() {
     let a = DMatrix::<f64>::from_row_slice(3, 3, &[
         1.0, 2.0, 3.0,
@@ -216,8 +289,45 @@ fn main() {
      */
     //  // ======== 1.5 End  of subtask==
 
+// Task 2
 
+    let xs = vec![-5.0, -4.0, -3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0, 4.0, 5.0];
+    let ys = vec![ 2.0,  7.0,  9.0, 12.0, 13.0,14.0,14.0,13.0,10.0, 8.0, 4.0];
 
+    let m = xs.len();
+    // build a as matrix m×3: [1, x, x^2]
+    let mut a = vec![vec![0.0; 3]; m];
+    for i in 0..m {
+        a[i][0] = 1.0;
+        a[i][1] = xs[i];
+        a[i][2] = xs[i] * xs[i];
+    }
 
+    let alpha = solve_least_squares_qr(&a, &ys);
 
+    println!("Elements of model f(x) = α0 + α1 x + α2 x^2:");
+    println!("  α0 = {:.8}", alpha[0]);
+    println!("  α1 = {:.8}", alpha[1]);
+    println!("  α2 = {:.8}", alpha[2]);
+
+    println!("Creating visualization");
+    let root = BitMapBackend::new("plot.png", (800, 600)).into_drawing_area();
+    root.fill(&WHITE).expect("TODO: panic message");
+    let mut chart = ChartBuilder::on(&root)
+        .caption("approx middlesq", ("sans-serif", 30))
+        .margin(20)
+        .x_label_area_size(40)
+        .y_label_area_size(40)
+        .build_cartesian_2d(-5.5..5.5, 0.0..15.0).expect("");
+
+    chart.configure_mesh()
+        .x_desc("x")
+        .y_desc("y")
+        .draw().expect("drawing plot failed");
+
+    chart.draw_series(
+        xs.iter()
+            .zip(ys.iter())
+            .map(|(&x, &y)| Circle::new((x, y), 5, BLUE.filled()))
+    ).expect("");
 }
